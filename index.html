@@ -1,75 +1,167 @@
 <!doctype html>
-<!--[if lt IE 7 ]> <html lang="en" class="ie6"> <![endif]-->
-<!--[if IE 7 ]>    <html lang="en" class="ie7"> <![endif]-->
-<!--[if IE 8 ]>    <html lang="en" class="ie8"> <![endif]-->
-<!--[if IE 9 ]>    <html lang="en" class="ie9"> <![endif]-->
-<!--[if !IE]><!--> <html lang="en"> <!--<![endif]-->
+<html lang="en">
 <head>
-<meta name="viewport" content="width = 1050, user-scalable = no" />
-<script type="text/javascript" src="extras/jquery.min.1.7.js"></script>
-<script type="text/javascript" src="extras/modernizr.2.5.3.min.js"></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Click-to-advance Crossfade Slideshow</title>
+<style>
+  /* page reset */
+  html,body { height:100%; margin:0; }
+  body {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#000;
+    overflow:hidden;
+    cursor:pointer; /* click anywhere */
+  }
+
+  /* container keeps aspect & centers content */
+  .slideshow {
+    position:relative;
+    width:90vw;            /* responsive width */
+    max-width:1200px;      /* optional cap */
+    height:calc(90vw * 0.66);/* default aspect (3:2). will be overridden by JS to match image aspect if desired */
+    max-height:90vh;
+    display:block;
+    isolation:isolate;
+  }
+
+  /* image layers */
+  .slide {
+    position:absolute;
+    inset:0;
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:contain;    /* preserve image aspect, fit inside container */
+    opacity:0;
+    transform:scale(1.02); /* tiny scale for smoother blend */
+    transition:opacity 600ms ease, transform 600ms ease;
+    pointer-events:none;
+    background:#000 center/contain no-repeat;
+  }
+
+  .slide.visible {
+    opacity:1;
+    transform:scale(1);
+  }
+
+  /* Make sure images don't overflow on very tall or wide screens */
+  @media (min-aspect-ratio: 3/2) {
+    .slideshow { width:80vw; height:calc(80vw * 0.66); }
+  }
+  @media (max-aspect-ratio: 3/2) {
+    .slideshow { height:80vh; width:auto; }
+  }
+</style>
 </head>
 <body>
-
-<div class="flipbook-viewport">
-	<div class="container">
-		<div class="flipbook">
-			<div class="page" style="background-image:url(pages/1.jpg)"></div>
-			<div class="double" style="background-image:url(pages/2.jpg)"></div>
-			<div class="double" style="background-image:url(pages/3.jpg)"></div>
-			<div class="double" style="background-image:url(pages/4.jpg)"></div>
-			<div class="double" style="background-image:url(pages/5.jpg)"></div>
-			<div class="double" style="background-image:url(pages/6.jpg)"></div>
-			<div class="page" style="background-image:url(pages/7.jpg)"></div>
-		</div>
-	</div>
+<div class="slideshow" id="slideshow" aria-live="polite">
+  <!-- Pre-created layers for crossfade. Add more if you want smoother preloading, but two suffice. -->
+  <img class="slide" id="slideA" alt="" draggable="false">
+  <img class="slide" id="slideB" alt="" draggable="false">
 </div>
 
+<script>
+(function(){
+  // List your images here in order (filenames or URLs)
+  const images = ['1.jpg','2.jpg','3.jpg','4.jpg','5.jpg','6.jpg','7.jpg','8.jpg','9.jpg','10.jpg','11.jpg']; // <-- update with your files
+  if (!images.length) return;
 
-<script type="text/javascript">
+  const slideA = document.getElementById('slideA');
+  const slideB = document.getElementById('slideB');
+  const container = document.getElementById('slideshow');
 
-function loadApp() {
+  let idx = 0;
+  let front = slideA; // currently visible layer
+  let back  = slideB;
 
-	var flipbook = $('.flipbook');
+  // preload image helper
+  function preload(src){
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = src;
+    });
+  }
 
- 	// Check if the CSS was already loaded
-	
-	if (flipbook.width()==0 || flipbook.height()==0) {
-		setTimeout(loadApp, 10);
-		return;
-	}
+  // set image to a layer using background-image for crisp contain scaling
+  function setLayerImage(layer, src, natural) {
+    // Use src attribute to help browsers cache and for accessibility if needed.
+    layer.src = src;
+    // object-fit:contain handles the sizing; we can also set container aspect to match first image
+    if (natural && natural.width && natural.height && !container.dataset.aspectSet) {
+      const aspect = natural.width / natural.height;
+      // Set container height based on its width to preserve aspect for the first image
+      const computedWidth = container.clientWidth;
+      const desiredHeight = computedWidth / aspect;
+      // clamp to viewport height
+      const vh = window.innerHeight * 0.9;
+      container.style.height = Math.min(desiredHeight, vh) + 'px';
+      container.dataset.aspectSet = '1';
+    }
+  }
 
-	$('.flipbook .double').scissor();
+  // show initial image instantly
+  preload(images[0]).then(img=>{
+    setLayerImage(front, images[0], img);
+    front.classList.add('visible');
+  }).catch(()=>{ setLayerImage(front, images[0]); front.classList.add('visible'); });
 
-	// Create the flipbook
+  // pre-load next image
+  function prepareNext(nextIdx) {
+    const src = images[nextIdx];
+    return preload(src).then(img => {
+      setLayerImage(back, src, img);
+    }).catch(()=> setLayerImage(back, src));
+  }
 
-	$('.flipbook').turn({
-			// Elevation
+  // advance to next image with crossfade
+  async function advance() {
+    const nextIdx = (idx + 1) % images.length;
+    await prepareNext(nextIdx);
+    // trigger crossfade
+    back.classList.add('visible');
+    front.classList.remove('visible');
 
-			elevation: 50,
-			
-			// Enable gradients
+    // swap references after transition (match transition duration in CSS if changed)
+    setTimeout(() => {
+      const tmp = front;
+      front = back;
+      back = tmp;
+      idx = nextIdx;
+    }, 650); // slightly longer than CSS transition (600ms)
+  }
 
-			gradients: true,
-			
-			// Auto center this flipbook
+  // click anywhere advances
+  window.addEventListener('click', (e) => {
+    // ignore clicks on UI elements if necessary; here we always advance
+    advance();
+  });
 
-			autoCenter: true
+  // keyboard support: space/arrow right to advance
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === ' ' || ev.key === 'ArrowRight') {
+      ev.preventDefault();
+      advance();
+    }
+  });
 
-	});
-}
+  // touch: also advance on touchend (immediate feedback)
+  window.addEventListener('touchend', (ev)=> {
+    advance();
+  }, {passive:true});
 
-// Load the HTML4 version if there's not CSS transform
+  // optional: handle resize to unset fixed aspect if container shrinks below viewport
+  window.addEventListener('resize', () => {
+    // allow container to shrink; keep the dataset flag so we don't constantly override
+    const maxH = window.innerHeight * 0.9;
+    if (container.clientHeight > maxH) container.style.height = Math.min(container.clientHeight, maxH) + 'px';
+  });
 
-yepnope({
-	test : Modernizr.csstransforms,
-	yep: ['lib/turn.min.js'],
-	nope: ['lib/turn.html4.min.js'],
-	both: ['lib/scissor.min.js', 'css/double-page.css'],
-	complete: loadApp
-});
-
+})();
 </script>
-
 </body>
 </html>
