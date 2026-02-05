@@ -6,25 +6,21 @@
 <!--[if !IE]><!--> <html lang="en"> <!--<![endif]-->
 <head>
 <meta name="viewport" content="width = 1050, user-scalable = no" />
-<script type="text/javascript" src="js/jquery.min.1.7.js"></script>
-<script type="text/javascript" src="js/modernizr.2.5.3.min.js"></script>
+<script type="text/javascript" src="extras/jquery.min.1.7.js"></script>
+<script type="text/javascript" src="extras/modernizr.2.5.3.min.js"></script>
 </head>
 <body>
 
 <div class="flipbook-viewport">
 	<div class="container">
 		<div class="flipbook">
-			<div style="background-image:url(pages/1.jpg)"></div>
-			<div style="background-image:url(pages/2.jpg)"></div>
-			<div style="background-image:url(pages/3.jpg)"></div>
-			<div style="background-image:url(pages/4.jpg)"></div>
-			<div style="background-image:url(pages/5.jpg)"></div>
-			<div style="background-image:url(pages/6.jpg)"></div>
-			<div style="background-image:url(pages/7.jpg)"></div>
-			<div style="background-image:url(pages/8.jpg)"></div>
-			<div style="background-image:url(pages/9.jpg)"></div>
-			<div style="background-image:url(pages/10.jpg)"></div>
-			<div style="background-image:url(pages/11.jpg)"></div>
+			<div class="page" style="background-image:url(pages/1.jpg)"></div>
+			<div class="double" style="background-image:url(pages/2.jpg)"></div>
+			<div class="double" style="background-image:url(pages/3.jpg)"></div>
+			<div class="double" style="background-image:url(pages/4.jpg)"></div>
+			<div class="double" style="background-image:url(pages/5.jpg)"></div>
+			<div class="double" style="background-image:url(pages/6.jpg)"></div>
+			<div class="page" style="background-image:url(pages/7.jpg)"></div>
 		</div>
 	</div>
 </div>
@@ -34,17 +30,20 @@
 
 function loadApp() {
 
+	var flipbook = $('.flipbook');
+
+ 	// Check if the CSS was already loaded
+	
+	if (flipbook.width()==0 || flipbook.height()==0) {
+		setTimeout(loadApp, 10);
+		return;
+	}
+
+	$('.flipbook .double').scissor();
+
 	// Create the flipbook
 
 	$('.flipbook').turn({
-			// Width
-
-			width:1136,
-			
-			// Height
-
-			height:568,
-
 			// Elevation
 
 			elevation: 50,
@@ -64,9 +63,9 @@ function loadApp() {
 
 yepnope({
 	test : Modernizr.csstransforms,
-	yep: ['lib/turn.js'],
+	yep: ['lib/turn.min.js'],
 	nope: ['lib/turn.html4.min.js'],
-	both: ['css/basic.css'],
+	both: ['lib/scissor.min.js', 'css/double-page.css'],
 	complete: loadApp
 });
 
